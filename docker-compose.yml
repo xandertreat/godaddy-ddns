@@ -1,0 +1,10 @@
+services:
+  go-ddns:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ddns_data:/ddns/ip
+
+volumes:
+  ddns_data:
