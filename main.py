@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 import logging
 import apscheduler.schedulers.blocking
@@ -6,9 +7,27 @@ import apscheduler.schedulers.blocking
 logging.basicConfig(level=logging.INFO,
                     format="[go-ddns] %(levelname)s  -  %(message)s")
 
+aps_logger = logging.getLogger("apscheduler")
+aps_logger.setLevel(logging.WARNING)
+aps_logger.propagate = False
+
 GODADDY_API_URL = "https://api.godaddy.com/v1/domains"
 IP_API_URL = "https://api.ipify.org"
 IP_STORAGE_FILE = "last_ip.txt"
+
+# Utility
+
+
+def safe_retry(func, retries=3, delay=2):
+    for attempt in range(retries):
+        try:
+            return func()
+        except Exception as e:
+            logging.warning(
+                f"Attempt {attempt + 1} failed with error: {e}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+    raise ValueError(f"All {retries} attempts failed.")
 
 # IP Service
 
@@ -59,8 +78,8 @@ def get_domain_name() -> str:
 
 def verify_domain_existence():
     try:
-        api_key: str = get_api_key()
-        domain_name: str = get_domain_name()
+        api_key: str = safe_retry(get_api_key)
+        domain_name: str = safe_retry(get_domain_name)
     except ValueError as e:
         logging.error(f"{e}")
         return False
@@ -81,8 +100,8 @@ def verify_domain_existence():
 
 
 def update_dns_record(new_ip: str):
-    api_key: str = get_api_key()
-    domain_name: str = get_domain_name()
+    api_key: str = safe_retry(get_api_key)
+    domain_name: str = safe_retry(get_domain_name)
 
     URL = f"{GODADDY_API_URL}/{domain_name}/records"
 
@@ -111,12 +130,6 @@ def update_dns_record(new_ip: str):
 
 def job():
     logging.info("Script started.")
-    try:
-        verify_domain_existence()
-    except ValueError as e:
-        logging.error(f"{e}")
-        return
-
     ip_changed, current_ip = check_ip_change()
     if ip_changed:
         try:
@@ -132,8 +145,13 @@ def job():
 
 if __name__ == "__main__":
     logging.info("Starting GoDaddy DDNS client.")
+    logging.info("Verifying domain existence / ownership.")
+    try:
+        verify_domain_existence()
+    except ValueError as e:
+        logging.error(f"{e}")
+        raise SystemExit(1)
     scheduler = apscheduler.schedulers.blocking.BlockingScheduler()
-    scheduler._logger.disabled = True  # Disable scheduler logging
     frequency = os.getenv("CHECK_FREQUENCY", "minutes")
     interval = int(os.getenv("CHECK_INTERVAL", "5"))
     match frequency:

@@ -3,8 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     volumes:
       - ddns_data:/ddns/ip
 
 volumes:
   ddns_data:
+    driver: local
