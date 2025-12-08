@@ -105,11 +105,13 @@ def check_ip_change():
 # GoDaddy API Service
 
 
-def get_api_key() -> str:
+def get_authorization() -> str:
     api_key = os.getenv("GODADDY_API_KEY")
-    if not api_key:
-        raise ValueError("GoDaddy API key not found in environment variables.")
-    return api_key
+    api_secret = os.getenv("GODADDY_SECRET")
+    if not api_key or not api_secret:
+        raise ValueError(
+            "GoDaddy API key or secret not found in environment variables.")
+    return f"sso-key {api_key}:{api_secret}"
 
 
 def get_domain_name() -> str:
@@ -122,7 +124,7 @@ def get_domain_name() -> str:
 
 def verify_domain_existence():
     try:
-        api_key: str = safe_retry(get_api_key)
+        auth: str = safe_retry(get_authorization)
         domain_name: str = safe_retry(get_domain_name)
     except ValueError as e:
         logging.error(f"{e}")
@@ -132,7 +134,7 @@ def verify_domain_existence():
 
     headers = {
         "accept": "application/json",
-        "Authorization": f"sso-key {api_key}",
+        "Authorization": auth,
     }
 
     response = send_request("get", URL, headers=headers, timeout=10)
@@ -144,7 +146,7 @@ def verify_domain_existence():
 
 
 def update_dns_record(new_ip: str):
-    api_key: str = safe_retry(get_api_key)
+    auth: str = safe_retry(get_authorization)
     domain_name: str = safe_retry(get_domain_name)
 
     URL = f"{GODADDY_API_URL}/{domain_name}/records"
@@ -152,7 +154,7 @@ def update_dns_record(new_ip: str):
     headers = {
         "accept": "application/json",
         "Content-Type": "application/json",
-        "Authorization": f"sso-key {api_key}",
+        "Authorization": auth,
     }
 
     data = [
