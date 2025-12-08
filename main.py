@@ -130,11 +130,11 @@ def job():
             "No IP change detected. DNS record not updated.")
 
 
-def main():
+if __name__ == "__main__":
     logging.info("Starting GoDaddy DDNS client.")
     scheduler = apscheduler.schedulers.blocking.BlockingScheduler()
-    time_preference = os.getenv("TIME_PREFERENCE", "minutes")
-    interval = int(os.getenv("INTERVAL", "5"))
+    time_preference = os.getenv("CHECK_TIME_PREFERENCE", "minutes")
+    interval = int(os.getenv("CHECK_INTERVAL", "5"))
     match time_preference:
         case "seconds":
             scheduler.add_job(job, "interval", seconds=interval)
@@ -147,5 +147,5 @@ def main():
         case _:
             logging.error(
                 "Invalid TIME_PREFERENCE value. Use 'seconds', 'minutes', 'hours', or 'days'.")
-            return
+            raise SystemExit(1)
     scheduler.start()
