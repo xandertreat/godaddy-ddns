@@ -12,7 +12,6 @@ aps_logger.setLevel(logging.WARNING)
 aps_logger.propagate = False
 
 DEBUG = os.getenv("DEBUG", "false").lower() in ("1", "true", "yes")
-DEBUG = True
 if DEBUG:
     logging.getLogger().setLevel(logging.DEBUG)
     logging.getLogger("requests").setLevel(logging.DEBUG)
