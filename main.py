@@ -11,6 +11,13 @@ aps_logger = logging.getLogger("apscheduler")
 aps_logger.setLevel(logging.WARNING)
 aps_logger.propagate = False
 
+DEBUG = os.getenv("DEBUG", "false").lower() in ("1", "true", "yes")
+DEBUG = True
+if DEBUG:
+    logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger("requests").setLevel(logging.DEBUG)
+    logging.getLogger("urllib3").setLevel(logging.DEBUG)
+
 GODADDY_API_URL = "https://api.godaddy.com/v1/domains"
 IP_API_URL = "https://api.ipify.org"
 IP_STORAGE_FILE = "last_ip.txt"
@@ -29,13 +36,50 @@ def safe_retry(func, retries=3, delay=2):
                 time.sleep(delay)
     raise ValueError(f"All {retries} attempts failed.")
 
+
+def send_request(method: str, url: str, **kwargs):
+    """Wrapper around requests.request that logs full request/response
+    details when the global DEBUG flag is enabled.
+    """
+    if DEBUG:
+        logging.debug(f"[http] Request -> {method.upper()} {url}")
+        hdrs = kwargs.get("headers")
+        if hdrs:
+            logging.debug(f"[http] Request headers: {hdrs}")
+        if "json" in kwargs:
+            logging.debug(f"[http] Request json: {kwargs['json']}")
+        if "data" in kwargs:
+            logging.debug(f"[http] Request data: {kwargs['data']}")
+        if "params" in kwargs:
+            logging.debug(f"[http] Request params: {kwargs['params']}")
+    response = requests.request(method, url, **kwargs)
+    if DEBUG:
+        logging.debug(f"[http] Response status: {response.status_code}")
+        try:
+            logging.debug(f"[http] Response headers: {dict(response.headers)}")
+        except Exception:
+            pass
+        body = None
+        try:
+            body = response.text
+        except Exception:
+            body = None
+        if body is not None:
+            max_len = 10000
+            if len(body) > max_len:
+                logging.debug(
+                    f"[http] Response body (truncated): {body[:max_len]}...")
+            else:
+                logging.debug(f"[http] Response body: {body}")
+    return response
+
 # IP Service
 
 
 def get_public_ip():
-    response = requests.get(IP_API_URL)
+    response = send_request("get", IP_API_URL, timeout=5)
     if response.status_code != 200:
-        raise ValueError("Error retrieving public IP address.")
+        raise ValueError("Failed to retrieve public IP address.")
     return response.text.strip()
 
 
@@ -91,11 +135,11 @@ def verify_domain_existence():
         "Authorization": f"sso-key {api_key}",
     }
 
-    response = requests.get(URL, headers=headers)
+    response = send_request("get", URL, headers=headers, timeout=10)
     if response.status_code == 404:
         return False
     elif response.status_code != 200:
-        raise ValueError("Error verifying domain existence.")
+        raise ValueError("Failed to verify domain existence.")
     return True
 
 
@@ -120,9 +164,9 @@ def update_dns_record(new_ip: str):
         }
     ]
 
-    response = requests.put(URL, json=data, headers=headers)
+    response = send_request("put", URL, json=data, headers=headers, timeout=10)
     if response.status_code != 200:
-        raise ValueError(f"Error updating DNS record - {response.text}")
+        raise ValueError(f"Failed to update DNS record - {response.text}")
     return True
 
 # Script
