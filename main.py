@@ -4,7 +4,7 @@ import logging
 import apscheduler.schedulers.blocking
 
 logging.basicConfig(level=logging.INFO,
-                    format="[go-ddns] %(levelname)s - %(message)s")
+                    format="[go-ddns] %(levelname)s  -  %(message)s")
 
 GODADDY_API_URL = "https://api.godaddy.com/v1/domains"
 IP_API_URL = "https://api.ipify.org"
@@ -25,7 +25,7 @@ def check_ip_change():
     try:
         with open(IP_STORAGE_FILE, "r") as file:
             last_ip = file.read().strip()
-            logging.info("Previous IP found: {last_ip}")
+            logging.info(f"Previous IP found: {last_ip}")
     except FileNotFoundError:
         last_ip = None
         logging.info("No previous IP found, assuming first run.")
@@ -34,9 +34,9 @@ def check_ip_change():
         with open(IP_STORAGE_FILE, "w") as file:
             file.write(current_ip)
         logging.info(
-            "IP address changed: {last_ip} -> {current_ip}")
+            f"IP address changed: {last_ip} -> {current_ip}")
         return True, current_ip
-    logging.info("IP address unchanged: {current_ip}")
+    logging.info(f"IP address unchanged: {current_ip}")
     return False, current_ip
 
 # GoDaddy API Service
@@ -61,8 +61,8 @@ def verify_domain_existence():
     try:
         api_key: str = get_api_key()
         domain_name: str = get_domain_name()
-    except ValueError:
-        logging.error("{e}")
+    except ValueError as e:
+        logging.error(f"{e}")
         return False
 
     URL = f"{GODADDY_API_URL}/{domain_name}"
@@ -103,7 +103,7 @@ def update_dns_record(new_ip: str):
 
     response = requests.put(URL, json=data, headers=headers)
     if response.status_code != 200:
-        raise ValueError("Error updating DNS record.")
+        raise ValueError(f"Error updating DNS record - {response.text}")
     return True
 
 # Script
@@ -113,8 +113,8 @@ def job():
     logging.info("Script started.")
     try:
         verify_domain_existence()
-    except ValueError:
-        logging.error("{e}")
+    except ValueError as e:
+        logging.error(f"{e}")
         return
 
     ip_changed, current_ip = check_ip_change()
@@ -123,8 +123,8 @@ def job():
             update_dns_record(current_ip)
             logging.info(
                 "DNS record updated to new IP: {current_ip}")
-        except ValueError:
-            logging.error("{e}")
+        except ValueError as e:
+            logging.error(f"{e}")
     else:
         logging.info(
             "No IP change detected. DNS record not updated.")
@@ -133,9 +133,10 @@ def job():
 if __name__ == "__main__":
     logging.info("Starting GoDaddy DDNS client.")
     scheduler = apscheduler.schedulers.blocking.BlockingScheduler()
-    time_preference = os.getenv("CHECK_TIME_PREFERENCE", "minutes")
+    scheduler._logger.disabled = True  # Disable scheduler logging
+    frequency = os.getenv("CHECK_FREQUENCY", "minutes")
     interval = int(os.getenv("CHECK_INTERVAL", "5"))
-    match time_preference:
+    match frequency:
         case "seconds":
             scheduler.add_job(job, "interval", seconds=interval)
         case "minutes":
