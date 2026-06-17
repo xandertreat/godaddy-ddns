@@ -18,7 +18,7 @@ if DEBUG:
     logging.getLogger("urllib3").setLevel(logging.DEBUG)
 
 GODADDY_API_URL = "https://api.godaddy.com/v1/domains"
-IP_API_URL = "https://api.ipify.org"
+GET_PUBLIC_IP_URL = "ifconfig.me/ip"
 IP_STORAGE_FILE = "last_ip.txt"
 
 # Utility
@@ -76,7 +76,7 @@ def send_request(method: str, url: str, **kwargs):
 
 
 def get_public_ip():
-    response = send_request("get", IP_API_URL, timeout=5)
+    response = send_request("get", GET_PUBLIC_IP_URL, timeout=5)
     if response.status_code != 200:
         raise ValueError("Failed to retrieve public IP address.")
     return response.text.strip()
